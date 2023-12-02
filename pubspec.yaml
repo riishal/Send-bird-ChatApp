@@ -44,6 +44,12 @@ dependencies:
   firebase_messaging: ^14.7.6
   flutter_local_notifications: ^16.2.0
   firebase_core: ^2.24.0
+  push: ^1.0.5
+  get: ^4.6.5
+  fluttertoast: ^8.2.2
+  scrollable_positioned_list: ^0.3.5
+  file_picker: ^5.2.7 # FileMessage
+  flutter_app_badger: ^1.5.0
 
 dev_dependencies:
   flutter_test:

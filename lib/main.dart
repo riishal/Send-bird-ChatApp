@@ -1,159 +1,201 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+// Copyright (c) 2023 Sendbird, Inc. All rights reserved.
+
+import 'dart:async';
+
+import 'package:chat_app/page/login_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:sendbird_sdk/sendbird_sdk.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get_navigation/src/root/get_material_app.dart';
+import 'package:get/get_navigation/src/routes/get_route.dart';
+import 'package:sendbird_chat_sdk/sendbird_chat_sdk.dart';
 
-import 'login_view.dart';
-import 'channel_list_view.dart';
-import 'create_channel_view.dart';
+import 'notifications/local_notifications_manager.dart';
+import 'notifications/push_manager.dart';
+import 'page/channel/feed_channel/feed_channel_list_page.dart';
+import 'page/channel/feed_channel/feed_channel_page.dart';
+import 'page/channel/group_channel/group_channel_create_page.dart';
+import 'page/channel/group_channel/group_channel_invite_page.dart';
+import 'page/channel/group_channel/group_channel_list_page.dart';
+import 'page/channel/group_channel/group_channel_page.dart';
+import 'page/channel/group_channel/group_channel_search_page.dart';
+import 'page/channel/group_channel/group_channel_send_file_message_page.dart';
+import 'page/channel/group_channel/group_channel_update_page.dart';
+import 'page/channel/open_channel/open_channel_create_page.dart';
+import 'page/channel/open_channel/open_channel_list_page.dart';
+import 'page/channel/open_channel/open_channel_page.dart';
+import 'page/channel/open_channel/open_channel_search_page.dart';
+import 'page/channel/open_channel/open_channel_update_page.dart';
+import 'page/main_page.dart';
+import 'page/message/message_update_page.dart';
+import 'page/user/user_nickname_update_page.dart';
+import 'page/user/user_page.dart';
+import 'page/user/user_profile_update_page.dart';
 
-import 'dart:convert';
+const sampleVersion = '4.1.0';
+const yourAppId = '4DF99F17-28BF-4741-90AB-99DAAA707E58';
 
-import 'notification_service.dart';
+void main() {
+  runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      FlutterError.onError = (errorDetails) {
+        debugPrint('[FlutterError] ${errorDetails.stack}');
+        Fluttertoast.showToast(
+          msg: '[FlutterError] ${errorDetails.stack}',
+          gravity: ToastGravity.CENTER,
+          toastLength: Toast.LENGTH_SHORT,
+        );
+      };
 
-Future _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print("Handling background message: ${message.messageId}");
+      await PushManager.initialize();
+      await LocalNotificationsManager.initialize();
 
-  final sendbirdDataString = message.data["sendbird"];
-  final sendbirdData = jsonDecode(sendbirdDataString);
-
-  print("Notification title: ${sendbirdData["sender"]["name"]}");
-  print("Notification body: ${sendbirdData["message"]}");
-
-  NotificationService.showNotification(
-    sendbirdData["sender"]["name"] ?? '',
-    sendbirdData["message"] ?? '',
-  );
-}
-
-@pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse response) {
-  print("notification tapped: notificationTapBackground");
-}
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  const DarwinInitializationSettings initializationSettingsDarwin =
-      DarwinInitializationSettings();
-
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: initializationSettingsDarwin,
-  );
-
-  await flutterLocalNotificationsPlugin.initialize(
-    initializationSettings,
-    onDidReceiveNotificationResponse:
-        (NotificationResponse notificationResponse) async {
-      print("Notification Recieved with flutterLocalNotificationsPlugin");
+      runApp(MyApp());
     },
-    onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+    (error, stackTrace) async {
+      debugPrint('[Error] $error\n$stackTrace');
+      Fluttertoast.showToast(
+        msg: '[Error] $error',
+        gravity: ToastGravity.CENTER,
+        toastLength: Toast.LENGTH_SHORT,
+      );
+    },
   );
-
-  await Firebase.initializeApp();
-  return runApp(const MyApp());
 }
 
-final appState = AppState();
-
-class AppState with ChangeNotifier {
-  bool didRegisterToken = false;
-  String? token;
-  String? destChannelUrl;
-
-  void setDestination(String? channelUrl) {
-    destChannelUrl = channelUrl;
-    notifyListeners();
-  }
-}
-
-class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
-
-  @override
-  MyAppState createState() => MyAppState();
-}
-
-class MyAppState extends State<MyApp> {
-  Future<void> initializeFirebase() async {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  }
-
-  @override
-  void initState() {
-    SendbirdSdk(appId: '4DF99F17-28BF-4741-90AB-99DAAA707E58').isInitialized;
-    initializeFirebase();
-    super.initState();
+class MyApp extends StatelessWidget {
+  MyApp({super.key}) {
+    SendbirdChat.init(appId: yourAppId);
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Sendbird Demo',
-      initialRoute: "/login",
-      routes: <String, WidgetBuilder>{
-        '/login': (context) => const LoginView(),
-        '/channel_list': (context) => const ChannelListView(),
-        '/create_channel': (context) => const CreateChannelView(),
-      },
+      title: 'Sendbird Chat Sample',
       theme: ThemeData(
-          fontFamily: "Gellix",
-          primaryColor: const Color(0xff742DDD),
-          textTheme: const TextTheme(
-              headline1: TextStyle(fontSize: 72.0, fontWeight: FontWeight.bold),
-              headline6:
-                  TextStyle(fontSize: 32.0, fontWeight: FontWeight.bold)),
-          textSelectionTheme: const TextSelectionThemeData(
-            cursorColor: Color(0xff732cdd),
-            selectionHandleColor: Color(0xff732cdd),
-            selectionColor: Color(0xffD1BAF4),
-          )),
+        primarySwatch: _createMaterialColor(
+          const Color.fromARGB(196, 90, 24, 196),
+        ),
+      ),
+      builder: (context, child) {
+        return ScrollConfiguration(behavior: _AppBehavior(), child: child!);
+      },
+      initialRoute: '/login',
+      getPages: [
+        GetPage(
+          name: '/login',
+          page: () => const LoginPage(),
+        ),
+        GetPage(
+          name: '/main',
+          page: () => const MainPage(),
+        ),
+        GetPage(
+          name: '/user',
+          page: () => const UserPage(),
+        ),
+        GetPage(
+          name: '/user/update/profile',
+          page: () => const UserProfileUpdatePage(),
+        ),
+        GetPage(
+          name: '/user/update/nickname',
+          page: () => const UserNicknameUpdatePage(),
+        ),
+        GetPage(
+          name: '/group_channel/list',
+          page: () => const GroupChannelListPage(),
+        ),
+        GetPage(
+          name: '/group_channel/search',
+          page: () => const GroupChannelSearchPage(),
+        ),
+        GetPage(
+          name: '/group_channel/create',
+          page: () => const GroupChannelCreatePage(),
+        ),
+        GetPage(
+          name: '/group_channel/update/:channel_url',
+          page: () => const GroupChannelUpdatePage(),
+        ),
+        GetPage(
+          name: '/group_channel/invite/:channel_url',
+          page: () => const GroupChannelInvitePage(),
+        ),
+        GetPage(
+          name: '/group_channel/:channel_url',
+          page: () => const GroupChannelPage(),
+        ),
+        GetPage(
+          name: '/group_channel/send_file_message/:channel_url',
+          page: () => const GroupChannelSendFileMessagePage(),
+        ),
+        GetPage(
+          name: '/open_channel/list',
+          page: () => const OpenChannelListPage(),
+        ),
+        GetPage(
+          name: '/open_channel/search',
+          page: () => const OpenChannelSearchPage(),
+        ),
+        GetPage(
+          name: '/open_channel/create',
+          page: () => const OpenChannelCreatePage(),
+        ),
+        GetPage(
+          name: '/open_channel/update/:channel_url',
+          page: () => const OpenChannelUpdatePage(),
+        ),
+        GetPage(
+          name: '/open_channel/:channel_url',
+          page: () => const OpenChannelPage(),
+        ),
+        GetPage(
+          name: '/message/update/:channel_type/:channel_url/:message_id',
+          page: () => const MessageUpdatePage(),
+        ),
+        GetPage(
+          name: '/feed_channel/list',
+          page: () => const FeedChannelListPage(),
+        ),
+        GetPage(
+          name: '/feed_channel/:channel_url',
+          page: () => const FeedChannelPage(),
+        ),
+      ],
     );
   }
+
+  MaterialColor _createMaterialColor(Color color) {
+    final int r = color.red, g = color.green, b = color.blue;
+    final strengths = <double>[.05];
+    final Map<int, Color> swatch = {};
+
+    for (int i = 1; i < 10; i++) {
+      strengths.add(0.1 * i);
+    }
+
+    for (final strength in strengths) {
+      final double ds = 0.5 - strength;
+      swatch[(strength * 1000).round()] = Color.fromRGBO(
+        r + ((ds < 0 ? r : (255 - r)) * ds).round(),
+        g + ((ds < 0 ? g : (255 - g)) * ds).round(),
+        b + ((ds < 0 ? b : (255 - b)) * ds).round(),
+        1,
+      );
+    }
+    return MaterialColor(color.value, swatch);
+  }
 }
-// import 'dart:async';
 
-// import 'package:chat_app/presentation/login_screen.dart';
-// import 'package:flutter/material.dart';
-// import 'package:sendbird_chat_sdk/sendbird_chat_sdk.dart';
-
-// const yourAppId = '4DF99F17-28BF-4741-90AB-99DAAA707E58';
-// void main() {
-//   runZonedGuarded<Future<void>>(
-//     () async {
-//       WidgetsFlutterBinding.ensureInitialized();
-//       FlutterError.onError = (errorDetails) {
-//         debugPrint('[FlutterError] ${errorDetails.stack}');
-//       };
-//       runApp(MyApp());
-//     },
-//     (error, stackTrace) async {
-//       debugPrint('[Error] $error\n$stackTrace');
-//     },
-//   );
-// }
-
-// class MyApp extends StatelessWidget {
-//   MyApp({super.key}) {
-//     SendbirdChat.init(appId: yourAppId);
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//         theme: ThemeData(
-//           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-//         ),
-//         debugShowCheckedModeBanner: false,
-//         home: const LoginScreen());
-//   }
-// }
+class _AppBehavior extends ScrollBehavior {
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+}
